@@ -1,4 +1,4 @@
-import PySimpleGUI as sg
+import flet as ft
 import json
 import os
 from datetime import datetime
@@ -34,67 +34,53 @@ def calculate_installments(value, num, start_date):
         })
     return installments_list
 
-# --- Layout da Interface ---
-sg.theme('LightBlue3')
+def main(page: ft.Page):
+    # Configuração da página
+    page.title = "Sistema de Gestão de Vendas"
+    page.theme_mode = ft.ThemeMode.LIGHT
+    page.padding = 20
+    page.scroll = ft.ScrollMode.ADAPTIVE
 
-# --- Aba de Cadastro de Clientes ---
-tab1_layout = [
-    [sg.Text('Cadastro de Cliente', font=('Arial', 16))],
-    [sg.Text('Nome Completo:', size=(15, 1)), sg.Input(key='-NOME_CLIENTE-')],
-    [sg.Text('CPF:', size=(15, 1)), sg.Input(key='-CPF_CLIENTE-')],
-    [sg.Text('Telefone:', size=(15, 1)), sg.Input(key='-TEL_CLIENTE-')],
-    [sg.Text('Apelido:', size=(15, 1)), sg.Input(key='-APELIDO_CLIENTE-')],
-    [sg.Text('Endereço:', size=(15, 1)), sg.Input(key='-ENDERECO_CLIENTE-')],
-    [sg.Button('Salvar Cliente', key='-SALVAR_CLIENTE-')]
-]
+    # Variáveis de estado
+    calculated_data = None
+    cliente_encontrado = None
 
-# --- Aba de Realização da Venda ---
-tab2_layout = [
-    [sg.Text('Busca de Cliente', font=('Arial', 16))],
-    [sg.Text('CPF do Cliente:', size=(15, 1)), sg.Input(key='-CPF_VENDA-'), sg.Button('Buscar Cliente', key='-BUSCAR-')],
-    [sg.Text('Cliente Encontrado:', size=(18, 1)), sg.Text('', key='-NOME_CLIENTE_ENCONTRADO-', font=('Arial', 12, 'bold'))],
-    [sg.HorizontalSeparator()],
-    [sg.Text('Dados da Venda', font=('Arial', 16))],
-    [sg.Text('Valor Total (R$):', size=(15, 1)), sg.Input(key='-VALOR_TOTAL-')],
-    [sg.Text('Número de Parcelas:', size=(15, 1)), sg.Input(key='-NUM_PARCELAS-')],
-    [sg.Text('Data da Compra:', size=(15, 1)), sg.Input(key='-DATA_COMPRA-', default_text=datetime.now().strftime("%d/%m/%Y")), sg.CalendarButton('Escolher Data', target='-DATA_COMPRA-')],
-    [sg.Button('Calcular Parcelas', key='-CALCULAR-'), sg.Button('Salvar Venda', key='-SALVAR_VENDA-')]
-]
+    # --- Controles para Cadastro de Clientes ---
+    nome_cliente_field = ft.TextField(label="Nome Completo", width=400)
+    cpf_cliente_field = ft.TextField(label="CPF", width=400)
+    tel_cliente_field = ft.TextField(label="Telefone", width=400)
+    apelido_cliente_field = ft.TextField(label="Apelido", width=400)
+    endereco_cliente_field = ft.TextField(label="Endereço", width=400)
 
-# --- Layout Principal com Abas ---
-layout = [
-    [sg.TabGroup([
-        [sg.Tab('Registrar Cliente', tab1_layout)],
-        [sg.Tab('Realizar Venda', tab2_layout)]
-    ])]
-]
+    # --- Controles para Realização de Venda ---
+    cpf_venda_field = ft.TextField(label="CPF do Cliente", width=300)
+    nome_cliente_encontrado_text = ft.Text("", size=16, weight=ft.FontWeight.BOLD)
+    
+    valor_total_field = ft.TextField(label="Valor Total (R$)", width=300)
+    num_parcelas_field = ft.TextField(label="Número de Parcelas", width=300)
+    data_compra_field = ft.TextField(
+        label="Data da Compra", 
+        width=300,
+        value=datetime.now().strftime("%d/%m/%Y")
+    )
 
-window = sg.Window('Sistema de Gestão de Vendas', layout, finalize=True)
-
-# --- Loop Principal para Lidar com Eventos ---
-while True:
-    event, values = window.read()
-
-    if event == sg.WIN_CLOSED:
-        break
-
-    # --- Lógica da Aba de Cadastro de Clientes ---
-    if event == '-SALVAR_CLIENTE-':
-        nome = values['-NOME_CLIENTE-']
-        cpf = values['-CPF_CLIENTE-']
-        tel = values['-TEL_CLIENTE-']
-        apelido = values['-APELIDO_CLIENTE-']
-        endereco = values['-ENDERECO_CLIENTE-']
+    # --- Funções de Eventos ---
+    def salvar_cliente(e):
+        nome = nome_cliente_field.value
+        cpf = cpf_cliente_field.value
+        tel = tel_cliente_field.value
+        apelido = apelido_cliente_field.value
+        endereco = endereco_cliente_field.value
 
         if not all([nome, cpf, tel]):
-            sg.popup('Nome, CPF e Telefone são obrigatórios.', title='Erro')
-            continue
+            mostrar_snackbar("Nome, CPF e Telefone são obrigatórios.", "red")
+            return
 
         clientes = load_json(CLIENTES_FILE)
         
         # Verifica se o cliente já existe pelo CPF
         if any(c['cpf'] == cpf for c in clientes):
-            sg.popup(f'Erro: Já existe um cliente com o CPF {cpf}.', title='Erro')
+            mostrar_snackbar(f"Erro: Já existe um cliente com o CPF {cpf}.", "red")
         else:
             novo_cliente = {
                 'nome': nome,
@@ -105,78 +91,194 @@ while True:
             }
             clientes.append(novo_cliente)
             save_json(clientes, CLIENTES_FILE)
-            sg.popup('Cliente salvo com sucesso!', title='Sucesso')
-            window['-NOME_CLIENTE-'].update('')
-            window['-CPF_CLIENTE-'].update('')
-            window['-TEL_CLIENTE-'].update('')
-            window['-APELIDO_CLIENTE-'].update('')
-            window['-ENDERECO_CLIENTE-'].update('')
+            mostrar_snackbar("Cliente salvo com sucesso!", "green")
+            
+            # Limpar campos
+            nome_cliente_field.value = ""
+            cpf_cliente_field.value = ""
+            tel_cliente_field.value = ""
+            apelido_cliente_field.value = ""
+            endereco_cliente_field.value = ""
+            page.update()
 
-    # --- Lógica da Aba de Realização da Venda ---
-    if event == '-BUSCAR-':
-        cpf_busca = values['-CPF_VENDA-']
-        nome_busca = values['-NOME_CLIENTE-']
-        apelido_busca = values['-APELIDO_CLIENTE-']
+    def buscar_cliente(e):
+        nonlocal cliente_encontrado
+        cpf_busca = cpf_venda_field.value
         clientes = load_json(CLIENTES_FILE)
         cliente_encontrado = next((c for c in clientes if c['cpf'] == cpf_busca), None)
-        cliente_encontrado = next((c for c in clientes if c['nome'] == nome_busca), None)
-        cliente_encontrado = next((c for c in clientes if c['apelido'] == apelido_busca), None)
         
         if cliente_encontrado:
-            window['-NOME_CLIENTE_ENCONTRADO-'].update(cliente_encontrado['nome'])
+            nome_cliente_encontrado_text.value = cliente_encontrado['nome']
+            mostrar_snackbar("Cliente encontrado!", "green")
         else:
-            window['-NOME_CLIENTE_ENCONTRADO-'].update('Cliente não encontrado')
-            sg.popup('Cliente não encontrado.', title='Erro')
+            nome_cliente_encontrado_text.value = "Cliente não encontrado"
+            mostrar_snackbar("Cliente não encontrado.", "orange")
+        page.update()
 
-    if event == '-CALCULAR-':
+    def calcular_parcelas(e):
+        nonlocal calculated_data, cliente_encontrado
+        
+        if not nome_cliente_encontrado_text.value or "não encontrado" in nome_cliente_encontrado_text.value:
+            mostrar_snackbar("Primeiro, busque um cliente válido.", "orange")
+            return
+
         try:
-            cpf_venda = values['-CPF_VENDA-']
-            if not values['-NOME_CLIENTE_ENCONTRADO-'] or "não encontrado" in values['-NOME_CLIENTE_ENCONTRADO-']:
-                sg.popup('Primeiro, busque um cliente válido.', title='Atenção')
-                continue
-                
-            valor_total = float(values['-VALOR_TOTAL-'].replace(',', '.'))
-            num_parcelas = int(values['-NUM_PARCELAS-'])
-            data_compra = datetime.strptime(values['-DATA_COMPRA-'], "%d/%m/%Y").date()
+            valor_total = float(valor_total_field.value.replace(',', '.'))
+            num_parcelas = int(num_parcelas_field.value)
+            data_compra = datetime.strptime(data_compra_field.value, "%d/%m/%Y").date()
 
             if valor_total <= 0 or num_parcelas <= 0:
-                sg.popup('Por favor, insira valores válidos.', title='Erro')
-                continue
+                mostrar_snackbar("Por favor, insira valores válidos.", "red")
+                return
 
             parcelas = calculate_installments(valor_total, num_parcelas, data_compra)
             
             # Armazena os dados calculados para salvar depois
-            window.write_event_value('-CALCULATED_DATA-', {
-                'cpf_cliente': cpf_venda,
+            calculated_data = {
+                'cpf_cliente': cpf_venda_field.value,
                 'valor_total': valor_total,
-                'data_compra': values['-DATA_COMPRA-'],
+                'data_compra': data_compra_field.value,
                 'parcelas': parcelas
-            })
+            }
 
-            # Exibe o resumo (pode ser em um popup ou na própria tela)
-            resumo = f"Venda para: {values['-NOME_CLIENTE_ENCONTRADO-']}\n" \
-                     f"Valor: R$ {valor_total:.2f}\n" \
-                     f"Parcelas: {num_parcelas} x R$ {parcelas[0]['valor']:.2f}\n"
-            
-            parcelas_texto = [f"P{p['numero']}: R$ {p['valor']:.2f} (Venc.: {p['data_vencimento']})" for p in parcelas]
-            sg.popup(resumo + "\nDetalhes das Parcelas:\n" + "\n".join(parcelas_texto), title="Resumo da Venda")
-
+            # Exibir resumo em dialog
+            mostrar_resumo_venda(parcelas, valor_total, num_parcelas)
 
         except (ValueError, IndexError):
-            sg.popup('Por favor, verifique se os campos "Valor Total", "Número de Parcelas" e "Data" estão corretos.', title='Erro')
+            mostrar_snackbar("Verifique se os campos estão corretos.", "red")
 
-    if event == '-SALVAR_VENDA-':
-        if '-CALCULATED_DATA-' in values:
+    def salvar_venda(e):
+        nonlocal calculated_data
+        
+        if calculated_data:
             vendas = load_json(VENDAS_FILE)
-            nova_venda = values['-CALCULATED_DATA-']
-            vendas.append(nova_venda)
+            vendas.append(calculated_data)
             save_json(vendas, VENDAS_FILE)
-            sg.popup('Venda salva com sucesso!', title='Sucesso')
-            window['-VALOR_TOTAL-'].update('')
-            window['-NUM_PARCELAS-'].update('')
-            window['-NOME_CLIENTE_ENCONTRADO-'].update('')
-            window['-CPF_VENDA-'].update('')
+            mostrar_snackbar("Venda salva com sucesso!", "green")
+            
+            # Limpar campos
+            valor_total_field.value = ""
+            num_parcelas_field.value = ""
+            nome_cliente_encontrado_text.value = ""
+            cpf_venda_field.value = ""
+            calculated_data = None
+            page.update()
         else:
-            sg.popup('Primeiro, calcule os dados da venda para salvar.', title='Atenção')
+            mostrar_snackbar("Primeiro, calcule os dados da venda.", "orange")
 
-window.close()
+    def mostrar_snackbar(mensagem, cor):
+        page.snack_bar = ft.SnackBar(
+            content=ft.Text(mensagem),
+            bgcolor=cor,
+        )
+        page.snack_bar.open = True
+        page.update()
+
+    def mostrar_resumo_venda(parcelas, valor_total, num_parcelas):
+        parcelas_texto = [f"P{p['numero']}: R$ {p['valor']:.2f} (Venc.: {p['data_vencimento']})" for p in parcelas]
+        
+        conteudo = ft.Column([
+            ft.Text(f"Venda para: {nome_cliente_encontrado_text.value}", size=16, weight=ft.FontWeight.BOLD),
+            ft.Text(f"Valor: R$ {valor_total:.2f}"),
+            ft.Text(f"Parcelas: {num_parcelas} x R$ {parcelas[0]['valor']:.2f}"),
+            ft.Divider(),
+            ft.Text("Detalhes das Parcelas:", weight=ft.FontWeight.BOLD),
+            *[ft.Text(parcela) for parcela in parcelas_texto]
+        ], scroll=ft.ScrollMode.ADAPTIVE)
+
+        dialog = ft.AlertDialog(
+            title=ft.Text("Resumo da Venda"),
+            content=conteudo,
+            actions=[
+                ft.TextButton("Fechar", on_click=lambda e: fechar_dialog(dialog))
+            ]
+        )
+        
+        page.dialog = dialog
+        dialog.open = True
+        page.update()
+
+    def fechar_dialog(dialog):
+        dialog.open = False
+        page.update()
+
+    # --- Layout da Aba de Cadastro de Clientes ---
+    tab_cadastro = ft.Container(
+        content=ft.Column([
+            ft.Text("Cadastro de Cliente", size=20, weight=ft.FontWeight.BOLD),
+            nome_cliente_field,
+            cpf_cliente_field,
+            tel_cliente_field,
+            apelido_cliente_field,
+            endereco_cliente_field,
+            ft.ElevatedButton(
+                "Salvar Cliente",
+                on_click=salvar_cliente,
+                color="white",
+                bgcolor="blue"
+            )
+        ], spacing=15)
+    )
+
+    # --- Layout da Aba de Realização de Venda ---
+    tab_venda = ft.Container(
+        content=ft.Column([
+            ft.Text("Busca de Cliente", size=20, weight=ft.FontWeight.BOLD),
+            ft.Row([
+                cpf_venda_field,
+                ft.ElevatedButton(
+                    "Buscar Cliente",
+                    on_click=buscar_cliente,
+                    color="white",
+                    bgcolor="green"
+                )
+            ]),
+            ft.Row([
+                ft.Text("Cliente Encontrado:", size=16),
+                nome_cliente_encontrado_text
+            ]),
+            ft.Divider(),
+            ft.Text("Dados da Venda", size=20, weight=ft.FontWeight.BOLD),
+            valor_total_field,
+            num_parcelas_field,
+            data_compra_field,
+            ft.Row([
+                ft.ElevatedButton(
+                    "Calcular Parcelas",
+                    on_click=calcular_parcelas,
+                    color="white",
+                    bgcolor="orange"
+                ),
+                ft.ElevatedButton(
+                    "Salvar Venda",
+                    on_click=salvar_venda,
+                    color="white",
+                    bgcolor="blue"
+                )
+            ], spacing=20)
+        ], spacing=15)
+    )
+
+    # --- Tabs Principal ---
+    tabs = ft.Tabs(
+        selected_index=0,
+        animation_duration=300,
+        tabs=[
+            ft.Tab(
+                text="Registrar Cliente",
+                content=tab_cadastro
+            ),
+            ft.Tab(
+                text="Realizar Venda",
+                content=tab_venda
+            )
+        ],
+        expand=1
+    )
+
+    # Adicionar tudo à página
+    page.add(tabs)
+
+# Executar o aplicativo
+if __name__ == "__main__":
+    ft.app(target=main)
