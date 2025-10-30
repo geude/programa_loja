@@ -123,7 +123,7 @@ pip install pyinstaller
 
 2. **Execute o comando de build**
 ```bash
-pyinstaller --onefile --windowed --name="GestaoDeVendas" --icon=icone.ico seu_arquivo.py
+pyinstaller --onefile --windowed --name="GestaoDeVendas" --icon=icone.ico programa_loja.py
 ```
 
 3. **O executável estará em:**
@@ -135,7 +135,7 @@ dist/GestaoDeVendas.exe
 Crie um arquivo `build.bat`:
 ```batch
 @echo off
-pyinstaller --onefile --windowed --name="GestaoDeVendas" --icon=icone.ico seu_arquivo.py
+pyinstaller --onefile --windowed --name="GestaoDeVendas" --icon=icone.ico programa_loja.py
 echo Executável criado em: dist\GestaoDeVendas.exe
 pause
 ```
